@@ -1,31 +1,8 @@
 # clawd-presence
 
-A physical presence display for AI agents. Your agent gets a face.
+A physical presence display for AI agents. Monogram + status updates on a dedicated screen.
 
-```
-+                              16:45                              +
-
-                          ▄▄▄▄▄▄▄▄▄▄          
-                        ▄█▀▀▀▀▀▀▀▀▀▀█▄        
-                       ▄█▀            ▀█▄       
-                      ▄█▀    ▄▄▄▄▄▄    ▀█▄      
-                     ▄█▀   ▄█▀▀▀▀▀▀█▄   ▀█▄     
-                    ▄█▀   ▄█▀        ▀█▄   ▀█▄    
-                   ▄█▀   ▄█▀          ▀█▄   ▀█▄   
-                  ▄█▀   ▄█▀            ▀█▄   ▀█▄  
-                 ▄█▀   ▄█████████████████████▄   ▀█▄
-                 █▀   ▄█▀                  ▀█▄   ▀█
-                 █   ▄█▀                    ▀█▄   █
-                 ███▀                          ▀███
-            
-                    ────────█▓▒░──────────────
-
-                              WORK
-                      
-                     Researching competitors
-
-+                             AGENT                               +
-```
+![clawd-presence screenshot](assets/screenshot.png)
 
 Most people run their agents headless. I run mine on a Linux laptop with the screen open, sitting on my desk. This is what it shows.
 
