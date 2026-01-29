@@ -4,93 +4,83 @@ A physical presence display for AI agents. Monogram + status updates on a dedica
 
 ![clawd-presence screenshot](assets/screenshot.png)
 
-Most people run their agents headless. I run mine on a Linux laptop with the screen open, sitting on my desk. This is what it shows.
+## The Problem
 
-## Why
-
-Chat has latency. You send a message, wait, wonder if it's stuck.
-
-A presence display inverts this. The agent broadcasts state continuously. You glance at it like a clock.
-
-- **See what's happening** without asking
-- **Know when it's stuck** - if it says IDLE during a task, something's wrong
-- **Ambient awareness** - like seeing a coworker at their desk
+Chat has latency. You send a message, wait, wonder if it's stuck. A presence display gives you a faster feedback loop - the agent broadcasts what it's doing continuously. Glance at it like a clock. Know instantly if things are on track.
 
 ## Quick Start
 
 ```bash
+# Install
 git clone https://github.com/voidcooks/clawd-presence.git
 cd clawd-presence
 
-# Pick your letter (A-Z)
-python3 scripts/configure.py --letter A --name "AGENT"
+# Pick your letter and name
+python3 scripts/configure.py --letter A --name "ATLAS"
 
-# Run the display
+# Start the display (run in a dedicated terminal)
 python3 scripts/display.py
 ```
 
-Update status from your agent:
+That's it. The display shows your letter, current state, and what the agent is working on.
+
+## Updating Status
+
+Your agent updates the display by calling:
+
 ```bash
-python3 scripts/status.py work "Building something"
-python3 scripts/status.py think "Analyzing options"  
+python3 scripts/status.py work "Researching competitors"
+python3 scripts/status.py think "Analyzing options"
 python3 scripts/status.py idle "Ready"
-python3 scripts/status.py alert "Need attention"
+python3 scripts/status.py alert "Need your attention"
 ```
+
+Updates appear instantly. No more wondering what's happening.
 
 ## States
 
-| State | Color | Use |
-|-------|-------|-----|
-| `idle` | Cyan | Waiting for input |
-| `work` | Green | Actively executing |
+| State | Color | When to use |
+|-------|-------|-------------|
+| `work` | Green | Actively doing something |
 | `think` | Yellow | Processing, deciding |
+| `idle` | Cyan | Ready, waiting |
 | `alert` | Red | Needs human attention |
-| `sleep` | Blue | Low power / inactive |
+| `sleep` | Blue | Low power mode |
 
-The display auto-returns to `idle` after 5 minutes of no updates. Prevents stale states.
+## Auto-Idle
+
+If no status update for 5 minutes, display returns to `idle`. Prevents stale states.
+
+```bash
+# Adjust timeout (default 300 seconds)
+python3 scripts/configure.py --timeout 600
+```
 
 ## Clawdbot Integration
 
-Auto-detect your agent's name from config:
+Auto-detect your agent's name:
 ```bash
 python3 scripts/configure.py --auto
 ```
 
 Add to your agent's instructions:
 ```
-Update presence whenever starting a task:
+Update presence when starting tasks:
 python3 /path/to/clawd-presence/scripts/status.py <state> "<message>"
 ```
 
-## Configuration
+## All 26 Letters
+
+Geometric monogram designs for A-Z included. Pick yours:
 
 ```bash
-# Set letter and display name
 python3 scripts/configure.py --letter E --name "EMMA"
-
-# Adjust auto-idle timeout (default 300 seconds)
-python3 scripts/configure.py --timeout 600
-
-# View current config
-python3 scripts/configure.py --show
-```
-
-## Custom Monograms
-
-All 26 letters (A-Z) included as geometric block designs in `assets/monograms/`.
-
-To regenerate or customize:
-```bash
-python3 scripts/generate_monograms.py
 ```
 
 ## Requirements
 
 - Python 3.8+
 - Terminal with 256-color support
-- `curses` (included in Python on Linux/macOS)
-
-Optional: `pyyaml` for `--auto` clawdbot detection
 
 ## License
 
