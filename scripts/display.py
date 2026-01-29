@@ -30,8 +30,6 @@ DEFAULT_CONFIG: dict[str, Any] = {
     "letter": "A",
     "name": "AGENT",
     "idle_timeout": 300,
-    "sleep_start": 23,
-    "sleep_end": 7,
 }
 
 DEFAULT_STATE: dict[str, Any] = {
@@ -245,13 +243,6 @@ def draw(stdscr: Any) -> None:
             
             state = state_data.get("state", "idle")
             message = state_data.get("message", "")
-            
-            # Auto-sleep during configured hours
-            hour = datetime.now().hour
-            sleep_start = config.get("sleep_start", 23)
-            sleep_end = config.get("sleep_end", 7)
-            if (hour >= sleep_start or hour < sleep_end) and state == "idle":
-                state = "sleep"
             
             cx, cy = w // 2, h // 2
             accent = STATE_COLORS.get(state, 10)

@@ -24,8 +24,6 @@ DEFAULT_CONFIG: dict[str, Any] = {
     "letter": "A",
     "name": "AGENT",
     "idle_timeout": 300,
-    "sleep_start": 23,
-    "sleep_end": 7,
 }
 
 # Common clawdbot config locations
@@ -139,14 +137,6 @@ Examples:
         help="Auto-idle timeout in seconds (0 to disable)"
     )
     parser.add_argument(
-        "--sleep-start", type=int, metavar="HOUR",
-        help="Hour to auto-sleep (0-23, default: 23)"
-    )
-    parser.add_argument(
-        "--sleep-end", type=int, metavar="HOUR",
-        help="Hour to wake from auto-sleep (0-23, default: 7)"
-    )
-    parser.add_argument(
         "--show", "-s", action="store_true",
         help="Show current configuration"
     )
@@ -175,8 +165,7 @@ Examples:
         else:
             print("Could not auto-detect agent name from clawdbot config")
             print("Tip: Install PyYAML (pip install pyyaml) if not installed")
-            if not any([args.letter, args.name, args.timeout, 
-                       args.sleep_start, args.sleep_end]):
+            if not any([args.letter, args.name, args.timeout]):
                 sys.exit(1)
     
     # Manual letter
@@ -197,15 +186,6 @@ Examples:
     # Timeout
     if args.timeout is not None:
         config["idle_timeout"] = max(0, args.timeout)
-        changed = True
-    
-    # Sleep hours
-    if args.sleep_start is not None:
-        config["sleep_start"] = args.sleep_start % 24
-        changed = True
-    
-    if args.sleep_end is not None:
-        config["sleep_end"] = args.sleep_end % 24
         changed = True
     
     # Save if changed

@@ -43,7 +43,7 @@ python3 scripts/status.py sleep
 | `work` | Green | Executing |
 | `think` | Yellow | Processing |
 | `alert` | Red | Needs human |
-| `sleep` | Blue | Inactive hours |
+| `sleep` | Blue | Low power |
 
 ## Auto-Idle
 

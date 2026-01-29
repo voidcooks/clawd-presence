@@ -68,7 +68,7 @@ python3 scripts/status.py alert "Need attention"
 | `work` | Green | Actively executing |
 | `think` | Yellow | Processing, deciding |
 | `alert` | Red | Needs human attention |
-| `sleep` | Blue | Inactive (auto 11pm-7am) |
+| `sleep` | Blue | Low power / inactive |
 
 The display auto-returns to `idle` after 5 minutes of no updates. Prevents stale states.
 
@@ -93,9 +93,6 @@ python3 scripts/configure.py --letter E --name "EMMA"
 
 # Adjust auto-idle timeout (default 300 seconds)
 python3 scripts/configure.py --timeout 600
-
-# Set sleep hours (default 11pm-7am)  
-python3 scripts/configure.py --sleep-start 23 --sleep-end 7
 
 # View current config
 python3 scripts/configure.py --show
