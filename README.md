@@ -2,6 +2,8 @@
 
 A physical presence display for AI agents. Monogram + status updates on a dedicated screen.
 
+[![ClawdHub](https://img.shields.io/badge/ClawdHub-clawd--presence-blue)](https://clawdhub.com/skills/clawd-presence)
+
 ![clawd-presence screenshot](assets/screenshot.png)
 
 ## The Problem
@@ -11,7 +13,10 @@ Chat has latency. You send a message, wait, wonder if it's stuck. A presence dis
 ## Quick Start
 
 ```bash
-# Install
+# Install via ClawdHub
+clawdhub install clawd-presence
+
+# Or clone directly
 git clone https://github.com/voidcooks/clawd-presence.git
 cd clawd-presence
 
