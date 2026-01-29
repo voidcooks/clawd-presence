@@ -1,66 +1,100 @@
-# Clawd Presence
+# clawd-presence
 
-Physical presence display for AI agents. Shows what your agent is doing in real-time.
+A physical presence display for AI agents. Your agent gets a face.
 
-Most people run their agents headless. This gives them a face.
+```
++                              16:45                              +
 
-![States](https://img.shields.io/badge/states-idle%20%7C%20work%20%7C%20think%20%7C%20alert%20%7C%20sleep-blue)
-![Python](https://img.shields.io/badge/python-3.8+-green)
-![License](https://img.shields.io/badge/license-MIT-blue)
+                          ▄▄▄▄▄▄▄▄▄▄          
+                        ▄█▀▀▀▀▀▀▀▀▀▀█▄        
+                       ▄█▀            ▀█▄       
+                      ▄█▀    ▄▄▄▄▄▄    ▀█▄      
+                     ▄█▀   ▄█▀▀▀▀▀▀█▄   ▀█▄     
+                    ▄█▀   ▄█▀        ▀█▄   ▀█▄    
+                   ▄█▀   ▄█▀          ▀█▄   ▀█▄   
+                  ▄█▀   ▄█▀            ▀█▄   ▀█▄  
+                 ▄█▀   ▄█████████████████████▄   ▀█▄
+                 █▀   ▄█▀                  ▀█▄   ▀█
+                 █   ▄█▀                    ▀█▄   █
+                 ███▀                          ▀███
+            
+                    ────────█▓▒░──────────────
 
-## Why?
+                              WORK
+                      
+                     Researching competitors
 
-Chat interfaces have latency. You message your agent, wait, wonder if it's stuck. A presence display inverts this - the agent broadcasts its state continuously.
++                             AGENT                               +
+```
 
-- **Faster feedback** - Glance at the screen, know what's happening
-- **No interruption** - Don't have to ask "what are you doing?"
-- **Accountability** - Agent can't silently stall
+Most people run their agents headless. I run mine on a Linux laptop with the screen open, sitting on my desk. This is what it shows.
+
+## Why
+
+Chat has latency. You send a message, wait, wonder if it's stuck.
+
+A presence display inverts this. The agent broadcasts state continuously. You glance at it like a clock.
+
+- **See what's happening** without asking
+- **Know when it's stuck** - if it says IDLE during a task, something's wrong
+- **Ambient awareness** - like seeing a coworker at their desk
 
 ## Quick Start
 
 ```bash
-# Clone
 git clone https://github.com/voidcooks/clawd-presence.git
 cd clawd-presence
 
-# Configure your letter
+# Pick your letter (A-Z)
 python3 scripts/configure.py --letter A --name "AGENT"
 
-# Run display (in a dedicated terminal/screen)
+# Run the display
 python3 scripts/display.py
+```
 
-# Update status from your agent
+Update status from your agent:
+```bash
 python3 scripts/status.py work "Building something"
+python3 scripts/status.py think "Analyzing options"  
+python3 scripts/status.py idle "Ready"
+python3 scripts/status.py alert "Need attention"
 ```
 
 ## States
 
-| State | Color | When to use |
-|-------|-------|-------------|
-| `idle` | Cyan | Ready, waiting |
-| `work` | Green | Actively doing something |
-| `think` | Yellow | Processing, analyzing |
+| State | Color | Use |
+|-------|-------|-----|
+| `idle` | Cyan | Waiting for input |
+| `work` | Green | Actively executing |
+| `think` | Yellow | Processing, deciding |
 | `alert` | Red | Needs human attention |
-| `sleep` | Blue | Inactive hours |
+| `sleep` | Blue | Inactive (auto 11pm-7am) |
 
-## Auto-Detection
+The display auto-returns to `idle` after 5 minutes of no updates. Prevents stale states.
 
-If you're running Clawdbot, auto-detect your agent's name:
+## Clawdbot Integration
 
+Auto-detect your agent's name from config:
 ```bash
 python3 scripts/configure.py --auto
+```
+
+Add to your agent's instructions:
+```
+Update presence whenever starting a task:
+python3 /path/to/clawd-presence/scripts/status.py <state> "<message>"
 ```
 
 ## Configuration
 
 ```bash
-# Set letter and name
+# Set letter and display name
 python3 scripts/configure.py --letter E --name "EMMA"
 
-# Set auto-idle timeout (default 5 min)
-python3 scripts/configure.py --timeout 300
+# Adjust auto-idle timeout (default 300 seconds)
+python3 scripts/configure.py --timeout 600
 
-# Set sleep hours (default 11pm-7am)
+# Set sleep hours (default 11pm-7am)  
 python3 scripts/configure.py --sleep-start 23 --sleep-end 7
 
 # View current config
@@ -69,22 +103,11 @@ python3 scripts/configure.py --show
 
 ## Custom Monograms
 
-Letter designs are in `assets/monograms/`. Edit or replace with your own.
+All 26 letters (A-Z) included as geometric block designs in `assets/monograms/`.
 
-Regenerate all:
+To regenerate or customize:
 ```bash
 python3 scripts/generate_monograms.py
-```
-
-## Integration
-
-Add to your agent's system prompt:
-
-```
-Update presence display when starting tasks:
-python3 /path/to/clawd-presence/scripts/status.py <state> "<message>"
-
-States: idle, work, think, alert, sleep
 ```
 
 ## Requirements
@@ -93,7 +116,7 @@ States: idle, work, think, alert, sleep
 - Terminal with 256-color support
 - `curses` (included in Python on Linux/macOS)
 
-Optional: `pyyaml` for `--auto` detection
+Optional: `pyyaml` for `--auto` clawdbot detection
 
 ## License
 
