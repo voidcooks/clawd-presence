@@ -1,85 +1,113 @@
 #!/usr/bin/env python3
 """
 Clawd Presence Display
+
 Terminal-based status display for AI agents.
+Designed for dedicated screens (old laptops, Raspberry Pi, spare monitors).
 """
+
+from __future__ import annotations
 
 import curses
 import json
-import time
 import math
-import os
-from pathlib import Path
+import signal
+import sys
+import time
 from datetime import datetime
+from pathlib import Path
+from typing import Any
 
-SCRIPT_DIR = Path(__file__).parent
-CONFIG_FILE = SCRIPT_DIR.parent / "config.json"
-STATE_FILE = SCRIPT_DIR.parent / "state.json"
+# Paths relative to script location
+SCRIPT_DIR = Path(__file__).parent.resolve()
+ROOT_DIR = SCRIPT_DIR.parent
+CONFIG_FILE = ROOT_DIR / "config.json"
+STATE_FILE = ROOT_DIR / "state.json"
+MONOGRAMS_DIR = ROOT_DIR / "assets" / "monograms"
 
+# Defaults
+DEFAULT_CONFIG: dict[str, Any] = {
+    "letter": "A",
+    "name": "AGENT",
+    "idle_timeout": 300,
+    "sleep_start": 23,
+    "sleep_end": 7,
+}
 
-def load_config():
-    """Load display configuration."""
-    default = {
-        "letter": "A",
-        "name": "AGENT",
-        "idle_timeout": 300,
-        "sleep_start": 23,
-        "sleep_end": 7,
-    }
-    if CONFIG_FILE.exists():
-        try:
-            with open(CONFIG_FILE) as f:
-                default.update(json.load(f))
-        except (json.JSONDecodeError, IOError):
-            pass
-    return default
+DEFAULT_STATE: dict[str, Any] = {
+    "state": "idle",
+    "message": "",
+    "updated": 0,
+}
 
-
-def load_state():
-    """Load current agent state."""
-    default = {"state": "idle", "message": "", "updated": time.time()}
-    if STATE_FILE.exists():
-        try:
-            with open(STATE_FILE) as f:
-                default.update(json.load(f))
-        except (json.JSONDecodeError, IOError):
-            pass
-    return default
+# Color mappings
+STATE_COLORS = {"idle": 10, "work": 11, "think": 12, "alert": 13, "sleep": 14}
+PULSE_SPEEDS = {"idle": 0.08, "work": 0.15, "think": 0.12, "alert": 0.15, "sleep": 0}
+GLOW_SPEEDS = {"idle": 0.03, "work": 0.06, "think": 0.04, "alert": 0.08, "sleep": 0}
 
 
-def save_state(state_data):
-    """Save state to file."""
-    with open(STATE_FILE, "w") as f:
-        json.dump(state_data, f)
+def load_json_file(filepath: Path, default: dict[str, Any]) -> dict[str, Any]:
+    """Load JSON file with fallback to default."""
+    if not filepath.exists():
+        return default.copy()
+    try:
+        with open(filepath, "r", encoding="utf-8") as f:
+            data = json.load(f)
+            if isinstance(data, dict):
+                result = default.copy()
+                result.update(data)
+                return result
+    except (json.JSONDecodeError, IOError, OSError):
+        pass
+    return default.copy()
 
 
-def get_file_mtime(filepath):
-    """Get file modification time, or 0 if doesn't exist."""
+def save_json_file(filepath: Path, data: dict[str, Any]) -> bool:
+    """Save data to JSON file. Returns True on success."""
+    try:
+        filepath.parent.mkdir(parents=True, exist_ok=True)
+        with open(filepath, "w", encoding="utf-8") as f:
+            json.dump(data, f, indent=2)
+        return True
+    except (IOError, OSError):
+        return False
+
+
+def get_mtime(filepath: Path) -> float:
+    """Get file modification time, 0 if doesn't exist."""
     try:
         return filepath.stat().st_mtime
     except (OSError, IOError):
-        return 0
+        return 0.0
 
 
-def load_monogram(letter):
+def load_monogram(letter: str) -> list[str]:
     """Load monogram design for a letter."""
-    mono_file = SCRIPT_DIR.parent / "assets" / "monograms" / f"{letter.upper()}.txt"
+    letter = letter.upper()
+    if not letter.isalpha() or len(letter) != 1:
+        letter = "A"
+    
+    mono_file = MONOGRAMS_DIR / f"{letter}.txt"
     if mono_file.exists():
-        with open(mono_file) as f:
-            return [line.rstrip() for line in f.readlines()]
+        try:
+            with open(mono_file, "r", encoding="utf-8") as f:
+                return [line.rstrip() for line in f.readlines()]
+        except (IOError, OSError):
+            pass
+    
     # Fallback: simple block letter
     return [
-        f"  {letter.upper()}  ",
-        f" {letter.upper()}{letter.upper()}{letter.upper()} ",
-        f"{letter.upper()}   {letter.upper()}",
-        f"{letter.upper()}{letter.upper()}{letter.upper()}{letter.upper()}{letter.upper()}",
-        f"{letter.upper()}   {letter.upper()}",
+        f"  {letter}  ",
+        f" {letter}{letter}{letter} ",
+        f"{letter}   {letter}",
+        f"{letter}{letter}{letter}{letter}{letter}",
+        f"{letter}   {letter}",
     ]
 
 
-def build_pulse(pos, width, state):
-    """Pre-compute pulse string."""
-    if state == "sleep":
+def build_pulse(pos: int, width: int, sleeping: bool) -> str:
+    """Build pulse animation string."""
+    if sleeping:
         return "─" * width
     
     chars = []
@@ -98,19 +126,19 @@ def build_pulse(pos, width, state):
     return "".join(chars)
 
 
-def draw(stdscr):
-    """Main display loop."""
+def init_colors() -> None:
+    """Initialize curses color pairs."""
     curses.start_color()
     curses.use_default_colors()
-
-    # Color palette - grayscale
+    
+    # Grayscale palette
     curses.init_pair(1, 255, -1)  # Bright white
     curses.init_pair(2, 252, -1)  # White
     curses.init_pair(3, 248, -1)  # Light gray
     curses.init_pair(4, 244, -1)  # Mid gray
     curses.init_pair(5, 240, -1)  # Dark gray
     curses.init_pair(6, 236, -1)  # Darker gray
-
+    
     # State accent colors
     curses.init_pair(10, 73, -1)   # Dusty cyan (idle)
     curses.init_pair(11, 108, -1)  # Sage green (work)
@@ -118,185 +146,204 @@ def draw(stdscr):
     curses.init_pair(13, 167, -1)  # Muted red (alert)
     curses.init_pair(14, 67, -1)   # Steel blue (sleep)
 
-    state_colors = {"idle": 10, "work": 11, "think": 12, "alert": 13, "sleep": 14}
-    pulse_speeds = {"idle": 0.08, "work": 0.15, "think": 0.12, "alert": 0.15, "sleep": 0}
-    glow_speeds = {"idle": 0.03, "work": 0.06, "think": 0.04, "alert": 0.08, "sleep": 0}
 
+def safe_addstr(stdscr: Any, y: int, x: int, text: str, attr: int = 0) -> None:
+    """Safely add string to screen, handling boundary errors."""
+    try:
+        h, w = stdscr.getmaxyx()
+        if 0 <= y < h and 0 <= x < w:
+            # Truncate text to fit
+            max_len = w - x - 1
+            if max_len > 0:
+                stdscr.addstr(y, x, text[:max_len], attr)
+    except curses.error:
+        pass
+
+
+def safe_addch(stdscr: Any, y: int, x: int, ch: str, attr: int = 0) -> None:
+    """Safely add character to screen."""
+    try:
+        h, w = stdscr.getmaxyx()
+        if 0 <= y < h - 1 and 0 <= x < w - 1:
+            stdscr.addch(y, x, ch, attr)
+    except curses.error:
+        pass
+
+
+def draw(stdscr: Any) -> None:
+    """Main display loop."""
+    init_colors()
     curses.curs_set(0)
-    stdscr.nodelay(1)
+    stdscr.nodelay(True)
     stdscr.timeout(33)  # ~30fps
-
+    
+    # Handle terminal resize
+    def handle_resize(signum: int, frame: Any) -> None:
+        curses.endwin()
+        stdscr.refresh()
+    
+    signal.signal(signal.SIGWINCH, handle_resize)
+    
     # Initial load
-    config = load_config()
-    state_data = load_state()
+    config = load_json_file(CONFIG_FILE, DEFAULT_CONFIG)
+    state_data = load_json_file(STATE_FILE, DEFAULT_STATE)
     monogram = load_monogram(config["letter"])
     
-    # Tracking
+    # Tracking for efficient updates
     frame = 0
-    state_mtime = get_file_mtime(STATE_FILE)
-    config_mtime = get_file_mtime(CONFIG_FILE)
-    last_state = None
-    last_message = None
+    state_mtime = get_mtime(STATE_FILE)
+    config_mtime = get_mtime(CONFIG_FILE)
+    last_state = ""
+    last_message = ""
     last_time_str = ""
+    last_size = (0, 0)
     
-    # Pulse width
     pulse_width = 32
-
-    stdscr.clear()
-
+    
     while True:
         try:
             key = stdscr.getch()
-            if key in (ord("q"), ord("Q"), 27):  # q, Q, or ESC
+            if key in (ord("q"), ord("Q"), 27):  # q, Q, ESC
                 break
-
-            now = time.time()
             
-            # Check state file by mtime (fast)
-            new_state_mtime = get_file_mtime(STATE_FILE)
+            now = time.time()
+            h, w = stdscr.getmaxyx()
+            
+            # Handle resize - full redraw
+            if (h, w) != last_size:
+                stdscr.clear()
+                last_state = ""
+                last_message = ""
+                last_time_str = ""
+                last_size = (h, w)
+            
+            # Check state file by mtime (efficient)
+            new_state_mtime = get_mtime(STATE_FILE)
             if new_state_mtime != state_mtime:
-                state_data = load_state()
+                state_data = load_json_file(STATE_FILE, DEFAULT_STATE)
                 state_mtime = new_state_mtime
                 
-                # Auto-idle timeout check
-                if config["idle_timeout"] > 0:
+                # Auto-idle timeout
+                timeout = config.get("idle_timeout", 300)
+                if timeout > 0:
                     elapsed = now - state_data.get("updated", now)
-                    if elapsed > config["idle_timeout"] and state_data["state"] not in ("idle", "sleep"):
+                    current = state_data.get("state", "idle")
+                    if elapsed > timeout and current not in ("idle", "sleep"):
                         state_data["state"] = "idle"
                         state_data["message"] = ""
-                        save_state(state_data)
+                        save_json_file(STATE_FILE, state_data)
             
-            # Check config file by mtime (fast)
-            new_config_mtime = get_file_mtime(CONFIG_FILE)
+            # Check config file by mtime
+            new_config_mtime = get_mtime(CONFIG_FILE)
             if new_config_mtime != config_mtime:
-                new_config = load_config()
-                if new_config["letter"] != config["letter"]:
+                new_config = load_json_file(CONFIG_FILE, DEFAULT_CONFIG)
+                if new_config.get("letter") != config.get("letter"):
                     monogram = load_monogram(new_config["letter"])
+                    stdscr.clear()  # Full redraw for new monogram
                 config = new_config
                 config_mtime = new_config_mtime
-
+            
             state = state_data.get("state", "idle")
             message = state_data.get("message", "")
-
+            
             # Auto-sleep during configured hours
             hour = datetime.now().hour
-            if (hour >= config["sleep_start"] or hour < config["sleep_end"]) and state == "idle":
+            sleep_start = config.get("sleep_start", 23)
+            sleep_end = config.get("sleep_end", 7)
+            if (hour >= sleep_start or hour < sleep_end) and state == "idle":
                 state = "sleep"
-
-            h, w = stdscr.getmaxyx()
+            
             cx, cy = w // 2, h // 2
-            accent = state_colors.get(state, 10)
-
+            accent = STATE_COLORS.get(state, 10)
+            
             # === MONOGRAM ===
             mark_y = cy - len(monogram) // 2 - 3
-            glow_speed = glow_speeds.get(state, 0.03)
+            glow_speed = GLOW_SPEEDS.get(state, 0.03)
             
             if state == "sleep":
-                brightness = 4  # Dim
+                brightness = 4
             else:
                 glow = (math.sin(frame * glow_speed) + 1) / 2
                 brightness = 2 if glow > 0.5 else 3
-
+            
             for i, line in enumerate(monogram):
                 x = cx - len(line) // 2
                 y = mark_y + i
-                if 0 <= y < h - 1 and 0 <= x < w - 1:
-                    try:
-                        stdscr.attron(curses.color_pair(brightness))
-                        stdscr.addstr(y, x, line[: w - x - 1])
-                        stdscr.attroff(curses.color_pair(brightness))
-                    except curses.error:
-                        pass
-
+                safe_addstr(stdscr, y, x, line, curses.color_pair(brightness))
+            
             # === PULSE LINE ===
             pulse_y = mark_y + len(monogram) + 1
             pulse_x = cx - pulse_width // 2
             
-            if 0 <= pulse_y < h - 1 and pulse_x >= 0:
-                speed = pulse_speeds.get(state, 0.08)
-                pos = int((frame * speed) % pulse_width) if speed > 0 else 0
-                pulse = build_pulse(pos, pulse_width, state)
-                
-                color = 6 if state == "sleep" else accent
-                try:
-                    stdscr.attron(curses.color_pair(color))
-                    stdscr.addstr(pulse_y, pulse_x, pulse)
-                    stdscr.attroff(curses.color_pair(color))
-                except curses.error:
-                    pass
-
-            # === STATE (only redraw on change) ===
+            speed = PULSE_SPEEDS.get(state, 0.08)
+            pos = int((frame * speed) % pulse_width) if speed > 0 else 0
+            pulse = build_pulse(pos, pulse_width, state == "sleep")
+            
+            color = 6 if state == "sleep" else accent
+            safe_addstr(stdscr, pulse_y, pulse_x, pulse, curses.color_pair(color))
+            
+            # === STATE (only on change) ===
             status_y = pulse_y + 3
-            if state != last_state and 0 <= status_y < h - 1:
+            if state != last_state:
                 state_str = state.upper()
-                try:
-                    stdscr.addstr(status_y, cx - 10, " " * 20)
-                    stdscr.attron(curses.color_pair(accent))
-                    stdscr.addstr(status_y, cx - len(state_str) // 2, state_str)
-                    stdscr.attroff(curses.color_pair(accent))
-                except curses.error:
-                    pass
+                # Clear previous
+                safe_addstr(stdscr, status_y, cx - 10, " " * 20)
+                safe_addstr(stdscr, status_y, cx - len(state_str) // 2, state_str, 
+                           curses.color_pair(accent))
                 last_state = state
-
-            # === MESSAGE (only redraw on change) ===
+            
+            # === MESSAGE (only on change) ===
             msg_y = pulse_y + 5
-            if message != last_message and 0 <= msg_y < h - 1:
-                try:
-                    stdscr.addstr(msg_y, 2, " " * (w - 4))
-                    if message:
-                        msg = message[: w - 4]
-                        stdscr.attron(curses.color_pair(5))
-                        stdscr.addstr(msg_y, cx - len(msg) // 2, msg)
-                        stdscr.attroff(curses.color_pair(5))
-                except curses.error:
-                    pass
+            if message != last_message:
+                safe_addstr(stdscr, msg_y, 2, " " * (w - 4))
+                if message:
+                    msg = message[:w - 4]
+                    safe_addstr(stdscr, msg_y, cx - len(msg) // 2, msg, 
+                               curses.color_pair(5))
                 last_message = message
-
+            
             # === CORNERS ===
-            try:
-                stdscr.attron(curses.color_pair(6))
-                stdscr.addch(0, 0, "+")
-                stdscr.addch(0, w - 2, "+")
-                stdscr.addch(h - 2, 0, "+")
-                stdscr.addch(h - 2, w - 2, "+")
-                stdscr.attroff(curses.color_pair(6))
-            except curses.error:
-                pass
-
-            # === TIME (only redraw on change) ===
+            safe_addch(stdscr, 0, 0, "+", curses.color_pair(6))
+            safe_addch(stdscr, 0, w - 2, "+", curses.color_pair(6))
+            safe_addch(stdscr, h - 2, 0, "+", curses.color_pair(6))
+            safe_addch(stdscr, h - 2, w - 2, "+", curses.color_pair(6))
+            
+            # === TIME (only on change) ===
             time_str = datetime.now().strftime("%H:%M")
             if time_str != last_time_str:
-                try:
-                    stdscr.attron(curses.color_pair(6))
-                    stdscr.addstr(1, cx - len(time_str) // 2, time_str)
-                    stdscr.attroff(curses.color_pair(6))
-                except curses.error:
-                    pass
+                safe_addstr(stdscr, 1, cx - len(time_str) // 2, time_str, 
+                           curses.color_pair(6))
                 last_time_str = time_str
-
+            
             # === NAME ===
             name = config.get("name", "AGENT")
-            try:
-                stdscr.attron(curses.color_pair(6))
-                stdscr.addstr(h - 2, cx - len(name) // 2, name)
-                stdscr.attroff(curses.color_pair(6))
-            except curses.error:
-                pass
-
+            safe_addstr(stdscr, h - 2, cx - len(name) // 2, name, curses.color_pair(6))
+            
             stdscr.refresh()
             frame += 1
-
+            
         except curses.error:
             pass
         except KeyboardInterrupt:
             break
 
 
-def main():
+def main() -> None:
     """Entry point."""
+    # Create state file if missing
     if not STATE_FILE.exists():
-        save_state({"state": "idle", "message": "", "updated": time.time()})
-    curses.wrapper(draw)
+        state = DEFAULT_STATE.copy()
+        state["updated"] = time.time()
+        save_json_file(STATE_FILE, state)
+    
+    # Create config file if missing
+    if not CONFIG_FILE.exists():
+        save_json_file(CONFIG_FILE, DEFAULT_CONFIG)
+    
+    try:
+        curses.wrapper(draw)
+    except KeyboardInterrupt:
+        pass
 
 
 if __name__ == "__main__":

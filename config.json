@@ -1,7 +1,0 @@
-{
-  "letter": "A",
-  "name": "AGENT",
-  "idle_timeout": 300,
-  "sleep_start": 23,
-  "sleep_end": 7
-}
